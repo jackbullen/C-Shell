@@ -1,2 +1,4 @@
 # cshell
-Simple shell.
+Simple shell. 
+
+Run "make" then "./a1".
