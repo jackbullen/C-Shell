@@ -1,7 +1,7 @@
 /*
  * main.c
  *
- * A simple program to illustrate the use of the GNU Readline library
+ * A simple shell.
  */
 #include <errno.h>
 #include <signal.h>
@@ -14,15 +14,31 @@
 #include <sys/wait.h>
 #include <readline/readline.h>
 
-int counter;
+int counter=0;
 
 
+/*
+ * Call bash commands using execvp.
+ * This function is called from within forked
+ * child processes to run our shells commands.
+ */
+void callCommand(char * command, char ** commands)
+{
+	if (execvp(command, commands) < 0)
+		    {
+		      perror(command);
+		      exit(1);
+		    }
+}
+
+/*
+ * Handler for SIGCHLD. Decrement counter when
+ * child processes terminate.
+ */
 void sigchldHandler(int sig)
 {
   int status;
   pid_t childPid;
-  
-  //  savedErrno = errno;
   while((childPid = waitpid(-1, &status, WNOHANG) > 0))
     {
       counter--;
@@ -35,20 +51,27 @@ void sigchldHandler(int sig)
 int main (int argc, char * argv[])
 {
 
+  // Setup SIGCHLD handler.
   struct sigaction sa;
   memset(&sa, 0 ,sizeof(sa));
   sa.sa_handler = sigchldHandler;
 
-  
-  // Get the username & path for shell.
+  // Get env username and setup var for CWD of our shell.
   char cwd[255];
   char *uid=getenv("USER");
-  char *pwd=getenv("PWD");
+  char *pwd;
+
   pid_t cid;
   pid_t bg_pid[5];
+
   int status[5];
+
+
+  // Infinite for loop that keeps our shell running.
 	for (;;)
+
 	{
+	  // Reset CWD so it doesn't self-concatenate after each cmd...
 	  memset(cwd, 0, 255);
 
 	  if (sigaction(SIGCHLD, &sa, NULL) == -1)
@@ -57,15 +80,18 @@ int main (int argc, char * argv[])
 	      return 1;
 	    }
 	  
+	  // Create CWD pathname.
 	  pwd=getenv("PWD");
 	  strcat(strcat(cwd,uid),"@");
 	  strcat(strcat(cwd,pwd),"$ ");
 	  
+	  // Shell prompt for input.
 	  char 	*cmd = readline (cwd);
 	  if (strlen(cmd) == 0) {
 	    continue;
 	  }
 	  
+
 	  char * pch;
 	  char ** command = malloc(8 * sizeof(char *));
 	  if( command == NULL) {
@@ -103,13 +129,20 @@ int main (int argc, char * argv[])
 
 	  // Print background processes.
 	  if (strcmp(command[0],"bglist") == 0)
-	    {                
-	      for (int j=0;j<counter;j++)
-		{
-		  printf("%d\n",bg_pid[j]);
+	  {                
+	    for (int j=0;j<counter;j++)
+	  	{
+			printf("%d\n",bg_pid[j]);
 		}
-	      continue;
-	    }
+	    continue;
+	  }
+
+	  // Kill a background process.
+	  if (strcmp(command[0], "bgkill") == 0)
+	  {
+		  kill((pid_t)command[1], SIGKILL);
+		  continue;
+	  }
 	  
 	  // Execute background process.
 	  if (strcmp(command[0], "bg") == 0)
@@ -126,12 +159,8 @@ int main (int argc, char * argv[])
 	      // For child process:                                                                      
 	      if (cid == 0)
 		{
-		  if (execvp(command[1], command+1) < 0)
-		    {
-		      perror(command[1]);
-		      exit(1);
-		    }
-		  
+			// Call the second command (command[1]), because command[0] is bg.
+			callCommand(command[1], command+1);
 		}
 	      
 	      // For parent process:                                                                     
@@ -139,10 +168,9 @@ int main (int argc, char * argv[])
 		{
 		  bg_pid[counter] = cid;
 		  counter++;
+		  printf("%d", counter);
 		  while ((cid = waitpid(-1, &status[counter], WNOHANG)) > 0)
-		    {
-		      counter--;
-		    }
+		    {}
 		}
 	      
 	    }
@@ -161,11 +189,7 @@ int main (int argc, char * argv[])
 	    // For child process:
 	    if (cid == 0)
 	      {
-		if (execvp(command[0], command) < 0)
-		  {
-		    perror(command[0]);
-		    exit(1);
-		  }
+			callCommand(command[0], command);
 	      }
 	    
 	    // For parent process:
@@ -180,6 +204,3 @@ int main (int argc, char * argv[])
 	}
 	return 0;
 }
-
-
-
