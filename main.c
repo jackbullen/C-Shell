@@ -41,7 +41,19 @@ void sigchldHandler(int sig)
   pid_t childPid;
   while((childPid = waitpid(-1, &status, WNOHANG) > 0))
     {
-      counter--;
+		printf("Background Child %d has terminated.\n", childPid);
+    	counter--;
+    }
+}
+
+void sigchldHandler2(int sig)
+{
+  int status;
+  pid_t childPid;
+  while((childPid = waitpid(-1, &status, WNOHANG) > 0))
+    {
+		printf("Foreground Child %d has terminated.", childPid);
+    	
     }
 }
     
@@ -52,9 +64,9 @@ int main (int argc, char * argv[])
 {
 
   // Setup SIGCHLD handler.
-  struct sigaction sa;
-  memset(&sa, 0 ,sizeof(sa));
-  sa.sa_handler = sigchldHandler;
+  struct sigaction sa2;
+  memset(&sa2, 0 ,sizeof(sa2));
+  sa2.sa_handler = sigchldHandler2;
 
   // Get env username and setup var for CWD of our shell.
   char cwd[255];
@@ -74,7 +86,7 @@ int main (int argc, char * argv[])
 	  // Reset CWD so it doesn't self-concatenate after each cmd...
 	  memset(cwd, 0, 255);
 
-	  if (sigaction(SIGCHLD, &sa, NULL) == -1)
+	  if (sigaction(SIGCHLD, &sa2, NULL) == -1)
 	    {
 	      perror("sigaction");
 	      return 1;
@@ -140,14 +152,20 @@ int main (int argc, char * argv[])
 	  // Kill a background process.
 	  if (strcmp(command[0], "bgkill") == 0)
 	  {
-		  kill((pid_t)command[1], SIGKILL);
+		  kill(atoi(command[1]), SIGTERM);
+		  counter--;
 		  continue;
 	  }
 	  
 	  // Execute background process.
 	  if (strcmp(command[0], "bg") == 0)
 	    {
-	      cid = fork();
+		// Different sigchld handler for background children.
+	    struct sigaction sa2;
+  		memset(&sa2, 0 ,sizeof(sa2));
+  		sa2.sa_handler = sigchldHandler2;
+
+	    cid = fork();
 	      
 	      // Error handling for fork failure.                                                    
 	      if (cid < 0)
@@ -169,15 +187,13 @@ int main (int argc, char * argv[])
 		  bg_pid[counter] = cid;
 		  counter++;
 		  printf("%d", counter);
-		  while ((cid = waitpid(-1, &status[counter], WNOHANG)) > 0)
-		    {}
+		  cid = waitpid(-1, &status[counter], WNOHANG);
 		}
 	      
 	    }
 	  
 	  
 	  else { // Not a background command.
-	    
 	    cid = fork();
 	    // Error handling for fork failure.
 	    if (cid < 0)
