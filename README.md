@@ -1,4 +1,2 @@
-### cshell
-# Simple shell. 
-
-Run "make" then "./a1".
+# cshell
+### CSC 360
