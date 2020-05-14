@@ -104,7 +104,7 @@ int main (int argc, char * argv[])
 	  }
 	  
 
-	  char * pch;
+	  char * input;
 	  char ** command = malloc(8 * sizeof(char *));
 	  if( command == NULL) {
 	    perror("malloc failure");
@@ -113,12 +113,12 @@ int main (int argc, char * argv[])
 	  
 	  int i = 0;
 	  
-	  pch = strtok(cmd," ");
+	  input = strtok(cmd," ");
 	  
-	  while (pch != NULL)
+	  while (input != NULL)
 	    {
-	      command[i] = pch;
-	      pch = strtok(NULL, " ");
+	      command[i] = input;
+	      input = strtok(NULL, " ");
 	      i++;
 	    }
 	  command[i] = NULL;
@@ -214,7 +214,7 @@ int main (int argc, char * argv[])
 		waitpid(cid, &status[counter], WUNTRACED);
 	      }
 	  }
-	  free (pch);
+	  free (input);
 	  free (cmd);
 	  free (command);
 	}
