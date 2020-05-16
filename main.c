@@ -14,8 +14,47 @@
 #include <sys/wait.h>
 #include <readline/readline.h>
 
-int counter=0;
 
+/*                                                                    
+ * Background process.
+ *                                                                    
+ * Holds pid of background child processs, it's status, and it's state (running or stopped).
+ *                                                                    
+ */
+struct bgProcess
+{
+  pid_t pid;
+  int status;
+  char* state;
+};
+
+// Global variables.
+int counter=0;
+struct bgProcess bg_pid[5];
+
+/*
+ * killProcess(pid to be removed)
+ *
+ * returns: 1 if success
+ *          0 if failure
+ *
+ */
+int killProcess(pid_t pid)
+{
+  for (int l = 0; l<counter; l++)
+    {
+      if (bg_pid[l].pid == pid)
+	{
+	  for (int k = l; k < counter; k++)
+	    {
+	      bg_pid[k] = bg_pid[k+1];
+		    }
+	  counter--;
+	  return 1;
+	}
+    }
+  return 0;
+}
 
 /*
  * Call bash commands using execvp.
@@ -41,19 +80,7 @@ void sigchldHandler(int sig)
   pid_t childPid;
   while((childPid = waitpid(-1, &status, WNOHANG) > 0))
     {
-		printf("Background Child %d has terminated.\n", childPid);
-    	counter--;
-    }
-}
-
-void sigchldHandler2(int sig)
-{
-  int status;
-  pid_t childPid;
-  while((childPid = waitpid(-1, &status, WNOHANG) > 0))
-    {
-		printf("Foreground Child %d has terminated.", childPid);
-    	
+      
     }
 }
     
@@ -64,9 +91,9 @@ int main (int argc, char * argv[])
 {
 
   // Setup SIGCHLD handler.
-  struct sigaction sa2;
-  memset(&sa2, 0 ,sizeof(sa2));
-  sa2.sa_handler = sigchldHandler2;
+  struct sigaction sa;
+  memset(&sa, 0 ,sizeof(sa));
+  sa.sa_handler = sigchldHandler;
 
   // Get env username and setup var for CWD of our shell.
   char cwd[255];
@@ -74,9 +101,9 @@ int main (int argc, char * argv[])
   char *pwd;
 
   pid_t cid;
-  pid_t bg_pid[5];
+  //  struct  bgProcess bg_pid[5];
 
-  int status[5];
+
 
 
   // Infinite for loop that keeps our shell running.
@@ -86,7 +113,7 @@ int main (int argc, char * argv[])
 	  // Reset CWD so it doesn't self-concatenate after each cmd...
 	  memset(cwd, 0, 255);
 
-	  if (sigaction(SIGCHLD, &sa2, NULL) == -1)
+	  if (sigaction(SIGCHLD, &sa, NULL) == -1)
 	    {
 	      perror("sigaction");
 	      return 1;
@@ -144,7 +171,7 @@ int main (int argc, char * argv[])
 	  {                
 	    for (int j=0;j<counter;j++)
 	  	{
-			printf("%d\n",bg_pid[j]);
+		  printf("%d[%s]: %d\n", j+1, bg_pid[j].state,bg_pid[j].pid);
 		}
 	    continue;
 	  }
@@ -152,22 +179,47 @@ int main (int argc, char * argv[])
 	  // Kill a background process.
 	  if (strcmp(command[0], "bgkill") == 0)
 	  {
-		  kill(atoi(command[1]), SIGTERM);
-		  counter--;
-		  continue;
+
+	    kill(bg_pid[atoi(command[1])-1].pid, SIGTERM);
+	    killProcess(bg_pid[atoi(command[1])-1].pid);
+	    
+	    continue;
 	  }
+
+	  // Send SIGSTOP
+          if (strcmp(command[0], "stop") == 0)
+	    {
+	      
+	      kill(bg_pid[atoi(command[1])-1].pid, SIGSTOP);
+	      bg_pid[atoi(command[1])-1].state = "S";
+	      
+	      continue;
+	    }
+	  
+	  
+
+	  // Send SIGCONT
+          if (strcmp(command[0], "start") == 0)
+	    {
+	      
+	      kill(bg_pid[atoi(command[1])-1].pid, SIGCONT);
+	      bg_pid[atoi(command[1])-1].state = "R";
+	      
+	      continue;
+	    }
 	  
 	  // Execute background process.
 	  if (strcmp(command[0], "bg") == 0)
 	    {
-		// Different sigchld handler for background children.
-	    struct sigaction sa2;
-  		memset(&sa2, 0 ,sizeof(sa2));
-  		sa2.sa_handler = sigchldHandler2;
 
-	    cid = fork();
+
+
+
 	      
-	      // Error handling for fork failure.                                                    
+	      cid = fork();
+	      
+	      // Error handling for fork failure.                         
+
 	      if (cid < 0)
 		{
 		  perror("Fork failure.");
@@ -184,10 +236,13 @@ int main (int argc, char * argv[])
 	      // For parent process:                                                                     
 	      else
 		{
-		  bg_pid[counter] = cid;
+		  bg_pid[counter].pid = cid;
+		  bg_pid[counter].state = "R";
+		  //bg_pid[counter]->cmnd = command[1];
 		  counter++;
 		  printf("%d", counter);
-		  cid = waitpid(-1, &status[counter], WNOHANG);
+		  cid = waitpid(-1, &bg_pid[counter].status, WNOHANG);
+
 		}
 	      
 	    }
@@ -211,7 +266,7 @@ int main (int argc, char * argv[])
 	    // For parent process:
 	    else
 	      {
-		waitpid(cid, &status[counter], WUNTRACED);
+		waitpid(cid, &bg_pid[counter].status, WUNTRACED);
 	      }
 	  }
 	  free (input);
