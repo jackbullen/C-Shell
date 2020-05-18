@@ -64,7 +64,7 @@ int killProcess(pid_t pid)
 void callCommand(char * command, char ** commands, pid_t pid)
 {
   execvp(command, commands);
-  perror("Error ");
+  perror("Call command Error ");
 }
 
 /*
@@ -136,7 +136,7 @@ int main (int argc, char * argv[])
 	    pid_test = waitpid(-1, &stat, WNOHANG);
 	    if (pid_test < 0 && counter != 0)
 	      {
-		perror("error: ");
+		perror("pid_testing error: ");
 	      }
 	    if (pid_test > 0)
 	      {
@@ -224,6 +224,7 @@ int main (int argc, char * argv[])
 		if (strcmp(bg_pid[atoi(command[1])-1].state,"S") == 0)
 		  {
 		    kill(bg_pid[atoi(command[1])-1].pid, SIGCONT);
+		    usleep(100);
 		  }
 		
 		kill(bg_pid[atoi(command[1])-1].pid, SIGTERM); 
@@ -242,7 +243,7 @@ int main (int argc, char * argv[])
 		    continue;
 		  }
 		
-		if ((atoi(command[1])>counter) || (atoi(command[1])<counter) || (atoi(command[1])==0))
+		if ((atoi(command[1])>counter) || (atoi(command[1])<=0))
 		  {
 		    printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
 		    continue;
@@ -335,6 +336,7 @@ int main (int argc, char * argv[])
 	      if (cid == 0)
 		{
 		  callCommand(command[0], command, cid);
+		  exit(1);
 		}
 	      
 	      // For parent process:
