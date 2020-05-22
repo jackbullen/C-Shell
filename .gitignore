@@ -2,3 +2,4 @@ testr.sh
 *.o
 a1
 *~
+Makefile
