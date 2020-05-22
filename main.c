@@ -68,7 +68,7 @@ void callCommand(char * command, char ** commands, pid_t pid)
 }
 
 /*
-Not being used because I can just check for dead children at start of my for(;;) loop [line:117].                                                         
+Not being used because I can just check for dead children at start of my for(;;) 
 Still here because I don't fully understand how it works and want to learn.
 
  * Handler for SIGCHLD. Decrement counter when
@@ -102,18 +102,23 @@ int main (int argc, char * argv[])
   char *uid=getenv("USER");
   char *pwd;
 
-  // pid_test and stat are for checking on children. lines[149-159].
+
+  pwd=getenv("PWD");
+  strcat(strcat(cwd,uid),"@");
+  strcat(strcat(cwd,pwd),"$ ");
+  
+  
   pid_t pid_test;
   int stat;
   
   pid_t cid;
 
   // Infinite for loop that keeps our shell running.
-	for (;;)
+         for (;;)
 	  {
 	    
 	    // Reset CWD so it doesn't self-concatenate after each cmd...
-	    memset(cwd, 0, 255);
+	    //	    memset(cwd, 0, 255);
 	    /*
 	      if (sigaction(SIGCHLD, &sa, NULL) == -1)
 	      {
@@ -122,34 +127,36 @@ int main (int argc, char * argv[])
 	      }
 	    */
 	    // Create CWD pathname.
-	    pwd=getenv("PWD");
+	    /*pwd=getenv("PWD");
 	    strcat(strcat(cwd,uid),"@");
 	    strcat(strcat(cwd,pwd),"$ ");
-	    
+	    */
 	    // Shell prompt for input.
 	    char 	*cmd = readline (cwd);
 	    if (strlen(cmd) == 0) {
 	      continue;
 	    }
 	    
-	    
-	    pid_test = waitpid(-1, &stat, WNOHANG);
-	    if (pid_test < 0 && counter != 0)
+
+	    for (int l = 0; l < counter; l++)
 	      {
-		perror("pid_testing error: ");
+		if (WIFEXITED(bg_pid[l].status))
+		  {
+		    pid_test = waitpid(bg_pid[l].pid, &stat, WNOHANG);
+		    if (pid_test < 0)
+		      {
+			perror("PID_TESTING ERROR: ");
+		      }
+		    
+		    
+		    if (pid_test>0)
+		      {
+			killProcess(pid_test);
+			l--;
+		      }
+		  }
 	      }
-	    if (pid_test > 0)
-	      {
-		
-		killProcess(pid_test);
-		
-	      }
-	    
-	    
-	    
-	    
-	    
-	    
+ 
 	    char * input;
 	    char ** command = malloc(8 * sizeof(char *));
 	    if( command == NULL) {
@@ -219,6 +226,12 @@ int main (int argc, char * argv[])
 	    // Kill a background process.
 	    if (strcmp(command[0], "bgkill") == 0)
 	      {
+
+		if (counter == 0)
+                  {
+                    printf("\nCurrently no background processes.\n\n");
+                    continue;
+                  }
 		
 		// Check if it's stopped. If so, need to start before terminating.
 		if (strcmp(bg_pid[atoi(command[1])-1].state,"S") == 0)
@@ -235,6 +248,11 @@ int main (int argc, char * argv[])
 	    // Send SIGSTOP
 	    if (strcmp(command[0], "stop") == 0)
 	      {
+		if (counter == 0)
+                  {
+                    printf("\nCurrently no background processes.\n\n");
+                    continue;
+                  }
 		
 		// stop got passed no params...
 		if (command[1] == NULL)
@@ -248,6 +266,11 @@ int main (int argc, char * argv[])
 		    printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
 		    continue;
 		  }
+
+		if (strcmp(bg_pid[atoi(command[1])-1].state,"S") == 0)
+                  {
+                    printf("\nProcess %d with pid = %d is already stopped.\n\n",atoi(command[1]),bg_pid[atoi(command[1])-1].pid);
+                  }
 		
 		kill(bg_pid[atoi(command[1])-1].pid, SIGSTOP);
 		bg_pid[atoi(command[1])-1].state = "S";
@@ -259,10 +282,33 @@ int main (int argc, char * argv[])
 	    // Send SIGCONT
 	    if (strcmp(command[0], "start") == 0)
 	      {
+		if (counter == 0)
+                  {
+                    printf("\nCurrently no background processes.\n\n");
+                    continue;
+                  }
+
+		if (command[1] == NULL)
+                  {
+                    printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
+                    continue;
+                  }
+		
+		if ((atoi(command[1])>counter) || (atoi(command[1])<=0))
+                  {
+                    printf("\nError: Trying to start an invalid process number.\nRun <bglist> to \
+see active background processes.\nProcess numbers may have changed if any processes terminated.\n\n");
+                    continue;
+                  }
+
+		if (strcmp(bg_pid[atoi(command[1])-1].state,"R") == 0)
+		  {
+		    printf("\nProcess %d with pid = %d is already running.\n\n",atoi(command[1]),bg_pid[atoi(command[1])-1].pid);
+		  }
 		
 		kill(bg_pid[atoi(command[1])-1].pid, SIGCONT);
 		bg_pid[atoi(command[1])-1].state = "R";
-		
+		free(cmd);
 		continue;
 	      }
 	    
