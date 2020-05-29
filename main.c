@@ -32,6 +32,7 @@ struct bgProcess
 int counter=0;
 struct bgProcess bg_pid[5];
 
+
 /*
  * killProcess(pid to be removed)
  *
@@ -67,46 +68,17 @@ void callCommand(char * command, char ** commands, pid_t pid)
   perror("Call command Error ");
 }
 
-/*
-Not being used because I can just check for dead children at start of my for(;;) 
-Still here because I don't fully understand how it works and want to learn.
-
- * Handler for SIGCHLD. Decrement counter when
- * child processes terminate.
- */
-/*
-void sigchldHandler(int sig)
-{
-  int status;
-  pid_t childPid;
-  while((childPid = waitpid(-1, &status, WNOHANG) > 0))
-    {
-      printf("Sig chld handler popping off: %d %d",sig, childPid);
-      killProcess(childPid);
-    }
-}
-*/
-  
-
-
 int main (int argc, char * argv[])
 {
-
-  // Setup SIGCHLD handler.
-  // struct sigaction sa;
-  // memset(&sa, 0 ,sizeof(sa));
-  //  sa.sa_handler = sigchldHandler;
 
   // Get env username and setup var for CWD of our shell.
   char cwd[255];
   char *uid=getenv("USER");
   char *pwd;
 
-
   pwd=getenv("PWD");
   strcat(strcat(cwd,uid),"@");
   strcat(strcat(cwd,pwd),"$ ");
-  
   
   pid_t pid_test;
   int stat;
@@ -116,28 +88,13 @@ int main (int argc, char * argv[])
   // Infinite for loop that keeps our shell running.
          for (;;)
 	  {
-	    
-	    // Reset CWD so it doesn't self-concatenate after each cmd...
-	    //	    memset(cwd, 0, 255);
-	    /*
-	      if (sigaction(SIGCHLD, &sa, NULL) == -1)
-	      {
-	      perror("sigaction");
-	      return 1;
-	      }
-	    */
-	    // Create CWD pathname.
-	    /*pwd=getenv("PWD");
-	    strcat(strcat(cwd,uid),"@");
-	    strcat(strcat(cwd,pwd),"$ ");
-	    */
-	    // Shell prompt for input.
-	    char 	*cmd = readline (cwd);
+	    char *cmd = readline (cwd);
 	    if (strlen(cmd) == 0) {
 	      continue;
 	    }
-	    
 
+
+	    // After receieving input, check all bg processes for status changes. Update bg_pid accordingly.
 	    for (int l = 0; l < counter; l++)
 	      {
 		if (WIFEXITED(bg_pid[l].status))
@@ -146,8 +103,7 @@ int main (int argc, char * argv[])
 		    if (pid_test < 0)
 		      {
 			perror("PID_TESTING ERROR: ");
-		      }
-		    
+		      }		    
 		    
 		    if (pid_test>0)
 		      {
@@ -175,6 +131,14 @@ int main (int argc, char * argv[])
 		i++;
 	      }
 	    command[i] = NULL;
+
+
+
+	    
+	    ////////////////////////////////////////////////////////////////////////////////////////////////////
+                                         	    // Command Definitions 					
+	    ////////////////////////////////////////////////////////////////////////////////////////////////////
+	    
 	    // Exit.
 	    if (strcmp(command[0], "exit") == 0)
 	      {
@@ -184,27 +148,22 @@ int main (int argc, char * argv[])
 	    // Change dir.
 	    if (strcmp(command[0], "cd") == 0)
 	      {
+
+		// cd got passed no dir...                                                                                                 
+                if (command[1] == NULL)
+                  {
+                    printf("\nError: No directory specified.");
+                    continue;
+                  }
+		
 		if (chdir(command[1])<0)
 		  {
 		    perror(command[1]);
 		  }
 		continue;
 	      }
-	    
-	    
-	    
-	    
-	    //   Problem: Creates bgProcess even if execvp fails...
-	    //
-	    //
-	    //
-	    ////
-	    //
-	    //  
-	    //
-	    ////
-	    
-	    // Print background processes.
+
+	    // List background processes. ie: print out bg_pid.
 	    if (strcmp(command[0],"bglist") == 0)
 	      {
 		if (counter == 0)
@@ -220,8 +179,7 @@ int main (int argc, char * argv[])
 		  }
 		printf("\n");
 		continue;
-	      }
-	    
+	      }	    
 	    
 	    // Kill a background process.
 	    if (strcmp(command[0], "bgkill") == 0)
@@ -230,6 +188,13 @@ int main (int argc, char * argv[])
 		if (counter == 0)
                   {
                     printf("\nCurrently no background processes.\n\n");
+                    continue;
+                  }
+		
+		// stop got passed no params...                                                                                              
+                if (command[1] == NULL)
+                  {
+                    printf("\nError: Trying to kill an invalid process number.\nRun <bglist> to see active background processes.\n\n");
                     continue;
                   }
 		
@@ -290,7 +255,7 @@ int main (int argc, char * argv[])
 
 		if (command[1] == NULL)
                   {
-                    printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
+                    printf("\nError: Trying to start an invalid process number.\nRun <bglist> to see active background processes.\n\n");
                     continue;
                   }
 		
@@ -352,8 +317,8 @@ see active background processes.\nProcess numbers may have changed if any proces
 		   * for the child to give errors. (~1000micro seconds).
 		   ***********************************************************************
 		   * we sleep so that our parent (where we are now) will arrive at the top of the for(;;)
-		   * and take our next command input (also displaying our cwd and username)
-		   * AFTER the ls command, or hopefully w.e. "relatiely" short background cmd.
+		   * and take our next command input (also displaying our cwd and username),
+		   * AFTER the ls command...
 		   * BUT ... u have to ask ... why would you run a short command like that in
 		   * the background.
 		   */
@@ -395,12 +360,6 @@ see active background processes.\nProcess numbers may have changed if any proces
 	    free (input);
 	    free (cmd);
 	    free (command);
-	    //continue;
-	  }
-	//if (WIFEXITED(stat)) {
-	// printf("exited, status=%d\n",WEXITSTATUS(stat));
-	//}
-	
+	  }	
 	return 0;
-	
 }
