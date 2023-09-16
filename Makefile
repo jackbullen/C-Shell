@@ -1,13 +1,11 @@
-`CC = gcc
-
-CFLAGS = -g -Wall
+CC = gcc
 
 TARGET = myshell
 
 all: $(TARGET)
 
 $(TARGET): main.c
-	$(CC) $(CFLAGS) -o $(TARGET) main.c -lreadline
+	$(CC) -o $(TARGET) main.c -lreadline
 
 clean:
 	rm $(TARGET)

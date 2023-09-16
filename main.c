@@ -12,7 +12,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <readline/readline.h>
+
+// For this version of assignment we want unlimited background processes.
+#define MAX_BACKGROUND_PROCESSES 5
+
+#define CONFIG_FILE "/.myshellrc"
+#define MAX_LINE 512
 
 /*
  * Background process.
@@ -29,7 +34,7 @@ struct bgProcess
 
 // Global variables.
 int counter = 0;
-struct bgProcess bg_pid[5];
+struct bgProcess bg_pid[MAX_BACKGROUND_PROCESSES];
 
 /*
  * killProcess(pid to be removed)
@@ -55,6 +60,65 @@ int killProcess(pid_t pid)
 	return 0;
 }
 
+const char* parsePS1(const char *color) 
+{
+
+	const char *color_code;
+	if (strcmp(color, "red") == 0) {
+		color_code = "\033[0;31m";
+	} else if (strcmp(color, "green") == 0) {
+		color_code = "\033[0;32m";
+	} else if (strcmp(color, "yellow") == 0) {
+		color_code = "\033[0;33m";
+	} else if (strcmp(color, "blue") == 0) {
+		color_code = "\033[0;34m";
+	} else if (strcmp(color, "magenta") == 0) {
+		color_code = "\033[0;35m";
+	} else if (strcmp(color, "cyan") == 0) {
+		color_code = "\033[0;36m";
+	} else {
+		color_code = "\033[0m";
+	}
+
+	return color_code;
+}
+
+const char* loadConfig(char *cwd) 
+{
+	char line[MAX_LINE];
+	char config_path[1024];
+	char value[1024] = "";
+
+	strncpy(config_path, getenv("PWD"), sizeof(config_path) - 1);
+	strcat(config_path, CONFIG_FILE);
+
+	FILE *file = fopen(config_path, "r");
+	if (!file) {
+		perror("Failed to open config.");
+		return "";
+	}
+	
+	while (fgets(line, sizeof(line), file)) {
+		char *setting = strtok(line, "=");
+		char *config_value = strtok(NULL, "=");
+
+		if (config_value) {
+			config_value[strcspn(config_value, "\n")] = 0;
+		}
+
+		if (setting && config_value) {
+			if (strcmp(setting, "PS1") == 0) {
+				strncpy(value, config_value, sizeof(value) - 1);
+			}
+		}
+	}
+	const char *color_code = parsePS1(value);
+	strcat(cwd, color_code);
+	fclose(file);
+	return color_code;
+}
+
+
 /*
  * Call bash commands using execvp.
  * This function is called from within forked
@@ -68,19 +132,22 @@ void callCommand(char *command, char **commands, pid_t pid)
 
 int main(int argc, char *argv[])
 {
+	// Setup command prompt.
+	char cwd[255] = "";
 
-	// Get env username and setup var for CWD of our shell.
-	char cwd[255];
+	// Could modify this to load entire cwd and also other config settings
+	// rather than setting uid and pwd after. Ie: cwd = loadConfig();
+	const char *color_code = loadConfig(cwd);
+
 	char *uid = getenv("USER");
-	char *pwd;
-
-	pwd = getenv("PWD");
+	char *pwd = getenv("PWD");
+	
 	strcat(strcat(cwd, uid), "@");
 	strcat(strcat(cwd, pwd), "$ ");
+	strcat(cwd, "\033[0m");
 
 	pid_t pid_test;
 	int stat;
-
 	pid_t cid;
 
 	// Infinite for loop that keeps our shell running.
@@ -161,15 +228,19 @@ int main(int argc, char *argv[])
 			{
 
 				memset(cwd, 0, sizeof(cwd));
-
-				if (getcwd(cwd, sizeof(cwd)) == NULL)
+				char newPrompt[1024];
+				if (getcwd(newPrompt, sizeof(cwd)) == NULL)
 				{
 					perror("getcwd() error");
 				}
 				else
 				{
 					// update cwd
-					snprintf(cwd, sizeof(cwd), "%s@%s$ ", uid, cwd);
+					// snprintf(newPrompt, sizeof(newPrompt), "%s@%s$ ", uid, pwd);
+					strcat(cwd, color_code);
+					strcat(cwd, newPrompt);
+					strcat(cwd, "$ ");
+					strcat(cwd, "\033[0m");
 				}
 			}
 			continue;
@@ -230,24 +301,28 @@ int main(int argc, char *argv[])
 				continue;
 			}
 
-			// stop got passed no params...
+			// Stop got passed no params
 			if (command[1] == NULL)
 			{
 				printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
 				continue;
 			}
 
+			// Stop got passed an invalid param
 			if ((atoi(command[1]) > counter) || (atoi(command[1]) <= 0))
 			{
 				printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
 				continue;
 			}
 
+			// Check if this process is already stopped.
 			if (strcmp(bg_pid[atoi(command[1]) - 1].state, "S") == 0)
 			{
-				printf("\nProcess %d with pid = %d is already stopped.\n\n", atoi(command[1]), bg_pid[atoi(command[1]) - 1].pid);
+				printf("\nPrEocess %d with pid = %d is already stopped.\n\n", atoi(command[1]), bg_pid[atoi(command[1]) - 1].pid);
+				continue;
 			}
 
+			// Send SIGSTOP to stop the process.
 			kill(bg_pid[atoi(command[1]) - 1].pid, SIGSTOP);
 			bg_pid[atoi(command[1]) - 1].state = "S";
 
@@ -283,6 +358,11 @@ see active background processes.\nProcess numbers may have changed if any proces
 
 			kill(bg_pid[atoi(command[1]) - 1].pid, SIGCONT);
 			bg_pid[atoi(command[1]) - 1].state = "R";
+
+			// Should we free cmd here?
+			//
+			//
+			//
 			free(cmd);
 			continue;
 		}
@@ -330,6 +410,11 @@ see active background processes.\nProcess numbers may have changed if any proces
 				usleep(2600);
 
 				// Setup the background process in our struct.
+
+				// Look into using memory allocation rather than simply assigning string literals.
+				//
+				//
+				//
 				bg_pid[counter].pid = cid;
 				bg_pid[counter].state = "R";
 				counter++;
@@ -337,9 +422,11 @@ see active background processes.\nProcess numbers may have changed if any proces
 		}
 
 		else
-		{ // Not a background command.
+		{ 
+			// Execute foreground process.
+
 			cid = fork();
-			// Error handling for fork failure.
+
 			if (cid < 0)
 			{
 				perror("Fork failure.");
@@ -359,9 +446,6 @@ see active background processes.\nProcess numbers may have changed if any proces
 				waitpid(cid, &bg_pid[counter].status, WUNTRACED);
 			}
 		}
-		// Variable input is coming from a string tokenize (strtok) and thus is not malloc'd.
-		// Therefore we do not need to free it.
-		// free (input);
 
 		// cmd is from readline and command from mallod, which created memory
 		// Therefore we must free them.
