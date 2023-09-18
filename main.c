@@ -67,8 +67,6 @@ const char *parsePS1(const char *color) {
         color_code = "\033[0;34m";
     } else if (strcmp(color, "magenta") == 0) {
         color_code = "\033[0;35m";
-    } else if (strcmp(color, "cyan") == 0) {
-        color_code = "\033[0;36m";
     } else {
         color_code = "\033[0m";
     }
@@ -86,7 +84,7 @@ const char *loadConfig(char *cwd) {
 
     FILE *file = fopen(config_path, "r");
     if (!file) {
-        perror("Failed to open config.");
+        perror("Failed to open config");
         return "";
     }
 
@@ -105,9 +103,17 @@ const char *loadConfig(char *cwd) {
         }
     }
     const char *color_code = parsePS1(value);
-    strcat(cwd, color_code);
     fclose(file);
     return color_code;
+}
+
+void incrementColor(const char *color_code, char *incremented_color_code) {
+    int color_value;
+    sscanf(color_code, "\033[0;%dm", &color_value);
+
+    color_value++;
+
+    sprintf(incremented_color_code, "\033[0;%dm", color_value);
 }
 
 /*
@@ -116,6 +122,7 @@ const char *loadConfig(char *cwd) {
  * child processes to run our shells commands.
  */
 void callCommand(char *command, char **commands, pid_t pid) {
+    printf("%s : %s", command, *commands);
     execvp(command, commands);
     perror("Call command Error ");
 }
@@ -127,13 +134,24 @@ int main(int argc, char *argv[]) {
     // Could modify this to load entire cwd and also other config settings
     // rather than setting uid and pwd after. Ie: cwd = loadConfig();
     const char *color_code = loadConfig(cwd);
+    char incremented_color_code[16];
+    incrementColor(color_code, incremented_color_code);
 
     char *uid = getenv("USER");
     char *pwd = getenv("PWD");
 
-    strcat(strcat(cwd, uid), "@");
-    strcat(strcat(cwd, pwd), "$ ");
+    char *lastSlash = strrchr(pwd, '/');
+    if (lastSlash) {
+        pwd = lastSlash + 1;
+    }
+    strcat(cwd, color_code);
+    strcat(cwd, uid);
     strcat(cwd, "\033[0m");
+    strcat(cwd, "@");
+    strcat(cwd, incremented_color_code);
+    strcat(cwd, pwd);
+    strcat(cwd, "\033[0m");
+    strcat(cwd, " % ");
 
     pid_t pid_test;
     int stat;
@@ -185,7 +203,7 @@ int main(int argc, char *argv[]) {
 
         // Exit.
         if (strcmp(command[0], "exit") == 0) {
-            exit(1);
+            exit(0);
         }
 
         // Change dir.
@@ -206,11 +224,22 @@ int main(int argc, char *argv[]) {
                     perror("getcwd() error");
                 } else {
                     // update cwd
-                    // snprintf(newPrompt, sizeof(newPrompt), "%s@%s$ ", uid, pwd);
+
+                    char *lastSlash = strrchr(newPrompt, '/');
+                    if (lastSlash) {
+                        lastSlash++;
+                    } else {
+                        lastSlash = newPrompt;
+                    }
+
                     strcat(cwd, color_code);
-                    strcat(cwd, newPrompt);
-                    strcat(cwd, "$ ");
+                    strcat(cwd, uid);
                     strcat(cwd, "\033[0m");
+                    strcat(cwd, "@");
+                    strcat(cwd, incremented_color_code);
+                    strcat(cwd, lastSlash);
+                    strcat(cwd, "\033[0m");
+                    strcat(cwd, " % ");
                 }
             }
             continue;
@@ -345,7 +374,7 @@ int main(int argc, char *argv[]) {
                 // Call the second command (command[1]), because command[0] is bg.
                 callCommand(command[1], command + 1, cid);
 
-                exit(1);
+                exit(0);
             }
 
             // For parent process:
@@ -378,7 +407,7 @@ int main(int argc, char *argv[]) {
             // For child process:
             if (cid == 0) {
                 callCommand(command[0], command, cid);
-                exit(1);
+                exit(0);
             }
 
             // For parent process:
