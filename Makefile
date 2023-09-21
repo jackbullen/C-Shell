@@ -1,17 +1,32 @@
 CC = gcc
+CFLAGS = -I./include -Wall
+LDFLAGS = -lreadline
 
-TARGET = myshell
+SRCS = ./src/main.c ./src/completions.c
+OBJS = $(patsubst ./src/%.c, ./obj/%.o, $(SRCS))
 
-all: $(TARGET) inf args
+TARGET = ./myshell
+INF = ./inf
+ARGS = ./args
 
-$(TARGET): main.c
-	$(CC) -o $(TARGET) main.c -lreadline
+all: $(TARGET)
 
-inf: tests/inf.c
-	gcc tests/inf.c -o tests/inf
+tests: $(INF) $(ARGS)
 
-args: tests/args.c
-	gcc tests/args.c -o tests/args
+$(TARGET): $(OBJS) | ./bin # bin is not used atm but here for future use
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+$(INF): ./test/inf.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(ARGS): ./test/args.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+./obj/%.o: ./src/%.c | ./obj
+	$(CC) $(CFLAGS) -c $< -o $@
+
+./obj ./bin:
+	mkdir -p $@
 
 clean:
-	rm $(TARGET)
+	rm -f $(TARGET) $(INF) $(ARGS) ./obj/*.o

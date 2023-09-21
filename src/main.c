@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "completions.h"
 
 // For this version of assignment we want unlimited background processes.
 #define MAX_BACKGROUND_PROCESSES 5
@@ -116,6 +117,21 @@ void incrementColor(const char *color_code, char *incremented_color_code) {
     sprintf(incremented_color_code, "\033[0;%dm", color_value);
 }
 
+void changePrompt(char* cwd, const char* color_code, const char* uid, const char* wd) {
+    char incremented_color_code[16];
+    incrementColor(color_code, incremented_color_code);
+
+    strcat(cwd, color_code);
+    strcat(cwd, uid);
+    strcat(cwd, "\033[0m");
+    strcat(cwd, "@");
+    strcat(cwd, incremented_color_code);
+    strcat(cwd, wd);
+    strcat(cwd, "\033[0m");
+    strcat(cwd, " % ");
+
+}
+
 /*
  * Call bash commands using execvp.
  * This function is called from within forked
@@ -128,6 +144,8 @@ void callCommand(char *command, char **commands, pid_t pid) {
 }
 
 int main(int argc, char *argv[]) {
+    initialize_completions();
+
     // Setup command prompt.
     char cwd[255] = "";
 
@@ -137,21 +155,23 @@ int main(int argc, char *argv[]) {
     char incremented_color_code[16];
     incrementColor(color_code, incremented_color_code);
 
-    char *uid = getenv("USER");
-    char *pwd = getenv("PWD");
+    const char *uid = getenv("USER");
+    const char *pwd = getenv("PWD");
 
     char *lastSlash = strrchr(pwd, '/');
     if (lastSlash) {
         pwd = lastSlash + 1;
     }
-    strcat(cwd, color_code);
-    strcat(cwd, uid);
-    strcat(cwd, "\033[0m");
-    strcat(cwd, "@");
-    strcat(cwd, incremented_color_code);
-    strcat(cwd, pwd);
-    strcat(cwd, "\033[0m");
-    strcat(cwd, " % ");
+    // strcat(cwd, color_code);
+    // strcat(cwd, uid);
+    // strcat(cwd, "\033[0m");
+    // strcat(cwd, "@");
+    // strcat(cwd, incremented_color_code);
+    // strcat(cwd, pwd);
+    // strcat(cwd, "\033[0m");
+    // strcat(cwd, " % ");
+
+    changePrompt(cwd, color_code, uid, pwd);
 
     pid_t pid_test;
     int stat;
@@ -214,12 +234,20 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
+            if (strcmp(command[1], "~") == 0) {
+                memset(cwd, 0, sizeof(cwd));
+                chdir(getenv("HOME"));
+                changePrompt(cwd, color_code, uid, uid);
+                continue;
+            }
+
             // change dir and catch errors
             if (chdir(command[1]) < 0) {
                 perror(command[1]);
             } else {
                 memset(cwd, 0, sizeof(cwd));
                 char newPrompt[1024];
+
                 if (getcwd(newPrompt, sizeof(cwd)) == NULL) {
                     perror("getcwd() error");
                 } else {
@@ -232,14 +260,15 @@ int main(int argc, char *argv[]) {
                         lastSlash = newPrompt;
                     }
 
-                    strcat(cwd, color_code);
-                    strcat(cwd, uid);
-                    strcat(cwd, "\033[0m");
-                    strcat(cwd, "@");
-                    strcat(cwd, incremented_color_code);
-                    strcat(cwd, lastSlash);
-                    strcat(cwd, "\033[0m");
-                    strcat(cwd, " % ");
+                    // strcat(cwd, color_code);
+                    // strcat(cwd, uid);
+                    // strcat(cwd, "\033[0m");
+                    // strcat(cwd, "@");
+                    // strcat(cwd, incremented_color_code);
+                    // strcat(cwd, lastSlash);
+                    // strcat(cwd, "\033[0m");
+                    // strcat(cwd, " % ");
+                    changePrompt(cwd, color_code, uid, lastSlash);
                 }
             }
             continue;
