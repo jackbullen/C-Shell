@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -I./include -Wall
 LDFLAGS = -lreadline
 
-SRCS = ./src/main.c ./src/completions.c
+SRCS = ./src/main.c ./src/completions.c ./src/bg_processes.c
 OBJS = $(patsubst ./src/%.c, ./obj/%.o, $(SRCS))
 
 TARGET = ./myshell

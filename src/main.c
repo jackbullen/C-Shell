@@ -12,48 +12,37 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "completions.h"
-
-// For this version of assignment we want unlimited background processes.
-#define MAX_BACKGROUND_PROCESSES 5
+#include "bg_processes.h"
 
 #define CONFIG_FILE "/.myshellrc"
 #define MAX_LINE 512
 
-/*
- * Background process.
- *
- * Holds pid of background child processs, it's status, and it's state (running or stopped).
- *
- */
-struct bgProcess {
-    pid_t pid;
-    int status;
-    char *state;
-};
+pthread_mutex_t lock;
 
-// Global variables.
-int counter = 0;
-struct bgProcess bg_pid[MAX_BACKGROUND_PROCESSES];
-
-/*
- * killProcess(pid to be removed)
- *
- * returns: 1 if success
- *          0 if failure
- *
- */
-int killProcess(pid_t pid) {
-    for (int l = 0; l < counter; l++) {
-        if (bg_pid[l].pid == pid) {
-            for (int k = l; k < counter; k++) {
-                bg_pid[k] = bg_pid[k + 1];
+void* monitor_bg_processes(void* arg) {
+    int stat;
+    while (1) {
+        pthread_mutex_lock(&lock);
+        struct Node* current = getHead();
+        while (current != NULL) {
+            pid_t pid_test = waitpid(current->data.pid, &stat, WNOHANG);
+            if (pid_test < 0) {
+                perror("PID_TESTING ERROR:");
             }
-            counter--;
-            return 1;
+            if (pid_test > 0){
+                printf("Process %d with pid = %d has terminated. stat = %d.\n", current->data.pid, pid_test, stat);
+                removeProcess(pid_test);
+                break;
+            } else {
+                current = current->next;
+            }
         }
+        pthread_mutex_unlock(&lock);
+        sleep(1);
     }
-    return 0;
+    return NULL;
 }
 
 const char *parsePS1(const char *color) {
@@ -132,19 +121,36 @@ void changePrompt(char* cwd, const char* color_code, const char* uid, const char
 
 }
 
-/*
- * Call bash commands using execvp.
- * This function is called from within forked
- * child processes to run our shells commands.
- */
 void callCommand(char *command, char **commands, pid_t pid) {
     printf("%s : %s", command, *commands);
     execvp(command, commands);
     perror("Call command Error ");
 }
 
+void handle_signal(int signal) {
+    pthread_mutex_destroy(&lock);
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
+
+    signal(SIGINT, handle_signal);
+    signal(SIGTERM, handle_signal);
+
     initialize_completions();
+
+    // Initialize monitor thread mutex
+    if (pthread_mutex_init(&lock, NULL) != 0) {
+        perror("Failed to initialize mutex");
+        exit(1);
+    }
+
+    // Setup background process monitor thread
+    pthread_t monitor_thread;
+    if (pthread_create(&monitor_thread, NULL, monitor_bg_processes, NULL) != 0) {
+        perror("Failed to create monitor thread");
+        exit(1);
+    }
 
     // Setup command prompt.
     char cwd[255] = "";
@@ -173,30 +179,15 @@ int main(int argc, char *argv[]) {
 
     changePrompt(cwd, color_code, uid, pwd);
 
-    pid_t pid_test;
-    int stat;
     pid_t cid;
 
     // Infinite for loop that keeps our shell running.
     for (;;) {
+
         char *cmd = readline(cwd);
+
         if (strlen(cmd) == 0) {
             continue;
-        }
-
-        // After receieving input, check all bg processes for status changes. Update bg_pid accordingly.
-        for (int l = 0; l < counter; l++) {
-            if (WIFEXITED(bg_pid[l].status)) {
-                pid_test = waitpid(bg_pid[l].pid, &stat, WNOHANG);
-                if (pid_test < 0) {
-                    perror("PID_TESTING ERROR: ");
-                }
-
-                if (pid_test > 0) {
-                    killProcess(pid_test);
-                    l--;
-                }
-            }
         }
 
         char *input;
@@ -206,6 +197,7 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
+        // Used for parsing input.
         int i = 0;
 
         input = strtok(cmd, " ");
@@ -274,16 +266,22 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        // Need to modify this to use linked list
+
         // List background processes. ie: print out bg_pid.
         if (strcmp(command[0], "bglist") == 0) {
-            if (counter == 0) {
+            struct Node* current = getHead();
+            if (current == NULL) {
                 printf("\nCurrently no background processes.\n\n");
                 continue;
             }
             printf("\n");
-            printf("%2s %6s   %10s\n", "#", "State", "Process ID");
-            for (int j = 0; j < counter; j++) {
-                printf("%2d   [%s]  %10d\n", j + 1, bg_pid[j].state, bg_pid[j].pid);
+            printf("%2s %6s   %10s    %4s\n", "#", "State", "Process ID", "Name");
+            int index = 1;
+            while (current != NULL) {
+                printf("%2d   [%s]  %10d  %8s\n", index, current->data.state, current->data.pid, current->data.name);
+                current = current->next;
+                index++;
             }
             printf("\n");
             continue;
@@ -291,89 +289,30 @@ int main(int argc, char *argv[]) {
 
         // Kill a background process.
         if (strcmp(command[0], "bgkill") == 0) {
-            if (counter == 0) {
-                printf("\nCurrently no background processes.\n\n");
-                continue;
-            }
-
-            // stop got passed no params...
             if (command[1] == NULL) {
                 printf("\nError: Trying to kill an invalid process number.\nRun <bglist> to see active background processes.\n\n");
                 continue;
             }
 
-            // Check if it's stopped. If so, need to start before terminating.
-            if (strcmp(bg_pid[atoi(command[1]) - 1].state, "S") == 0) {
-                kill(bg_pid[atoi(command[1]) - 1].pid, SIGCONT);
-                usleep(100);
-            }
-
-            kill(bg_pid[atoi(command[1]) - 1].pid, SIGTERM);
-            continue;
-        }
-
-        // Send SIGSTOP
-        if (strcmp(command[0], "stop") == 0) {
-            if (counter == 0) {
-                printf("\nCurrently no background processes.\n\n");
+            int index = atoi(command[1]);
+            if (index <= 0) {
+                printf("\nError: Trying to kill an invalid process number.\nRun <bglist> to see active background processes.\n\n");
                 continue;
             }
 
-            // Stop got passed no params
-            if (command[1] == NULL) {
-                printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
+            struct Node* current = getHead();
+            int currentIndex = 1;
+            while (current != NULL && currentIndex < index) {
+                current = current->next;
+                currentIndex++;
+            }
+
+            if (current == NULL) {
+                printf("\nError: Process number %d does not exist.\nRun <bglist> to see active background processes.\n\n", index);
                 continue;
             }
 
-            // Stop got passed an invalid param
-            if ((atoi(command[1]) > counter) || (atoi(command[1]) <= 0)) {
-                printf("\nError: Trying to stop an invalid process number.\nRun <bglist> to see active background processes.\n\n");
-                continue;
-            }
-
-            // Check if this process is already stopped.
-            if (strcmp(bg_pid[atoi(command[1]) - 1].state, "S") == 0) {
-                printf("\nPrEocess %d with pid = %d is already stopped.\n\n", atoi(command[1]), bg_pid[atoi(command[1]) - 1].pid);
-                continue;
-            }
-
-            // Send SIGSTOP to stop the process.
-            kill(bg_pid[atoi(command[1]) - 1].pid, SIGSTOP);
-            bg_pid[atoi(command[1]) - 1].state = "S";
-
-            continue;
-        }
-
-        // Send SIGCONT
-        if (strcmp(command[0], "start") == 0) {
-            if (counter == 0) {
-                printf("\nCurrently no background processes.\n\n");
-                continue;
-            }
-
-            if (command[1] == NULL) {
-                printf("\nError: Trying to start an invalid process number.\nRun <bglist> to see active background processes.\n\n");
-                continue;
-            }
-
-            if ((atoi(command[1]) > counter) || (atoi(command[1]) <= 0)) {
-                printf(
-                    "\nError: Trying to start an invalid process number.\nRun <bglist> to see active background processes.\nProcess numbers may have changed if any processes terminated.\n\n");
-                continue;
-            }
-
-            if (strcmp(bg_pid[atoi(command[1]) - 1].state, "R") == 0) {
-                printf("\nProcess %d with pid = %d is already running.\n\n", atoi(command[1]), bg_pid[atoi(command[1]) - 1].pid);
-            }
-
-            kill(bg_pid[atoi(command[1]) - 1].pid, SIGCONT);
-            bg_pid[atoi(command[1]) - 1].state = "R";
-
-            // Should we free cmd here?
-            //
-            //
-            //
-            free(cmd);
+            kill(current->data.pid, SIGTERM);
             continue;
         }
 
@@ -384,42 +323,28 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            // If we have max # of background processes.
-            if (counter == 5) {
-                continue;
-            }
-
             cid = fork();
-
-            // Error handling for fork failure.
 
             if (cid < 0) {
                 perror("Fork failure.");
                 exit(1);
             }
 
-            // For child process:
             if (cid == 0) {
-                // Call the second command (command[1]), because command[0] is bg.
+                // Child process
                 callCommand(command[1], command + 1, cid);
-
                 exit(0);
             }
 
-            // For parent process:
             else {
-                // Ensure the child process is running before we add it to our bg_pid struct.
+                // Parent process
                 usleep(2600);
-
-                // Setup the background process in our struct.
-
-                // Look into using memory allocation rather than simply assigning string literals.
-                //
-                //
-                //
-                bg_pid[counter].pid = cid;
-                bg_pid[counter].state = "R";
-                counter++;
+                struct bgProcess newProcess;
+                newProcess.pid = cid;
+                newProcess.state = "R";
+                newProcess.status = 0;
+                newProcess.name = command[1];
+                addProcess(newProcess);
             }
         }
 
@@ -441,7 +366,8 @@ int main(int argc, char *argv[]) {
 
             // For parent process:
             else {
-                waitpid(cid, &bg_pid[counter].status, WUNTRACED);
+                int status;
+                waitpid(cid, &status, WUNTRACED);
             }
         }
 
@@ -449,6 +375,9 @@ int main(int argc, char *argv[]) {
         // Therefore we must free them.
         free(cmd);
         free(command);
+
+        
     }
+    pthread_mutex_destroy(&lock);
     return 0;
 }
