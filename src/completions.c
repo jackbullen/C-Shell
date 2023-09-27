@@ -37,7 +37,7 @@ char** my_completion(const char* text, int start, int end) {
             // printf("\n%s\n", rl_line_buffer);
             // rl_point = rl_end;
             // rl_redisplay();
-            printf("\n%s\n", all_matches);
+            // printf("\n%s\n", all_matches);
             free(all_matches);
         }
 
@@ -47,7 +47,7 @@ char** my_completion(const char* text, int start, int end) {
         char *command = strtok(command_str, " ");
         
         if (start > 0 && command && ( (strcmp(command, "cd")) == 0 || (strcmp(command, "ls") == 0) )) {
-            printf("adding slash, command=%s\n", command);
+            // printf("adding slash, command=%s\n", command);
             rl_completion_append_character = '/';
         }
         

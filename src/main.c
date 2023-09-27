@@ -32,7 +32,7 @@ void* monitor_bg_processes(void* arg) {
                 perror("PID_TESTING ERROR:");
             }
             if (pid_test > 0){
-                printf("Process %d with pid = %d has terminated. stat = %d.\n", current->data.pid, pid_test, stat);
+                printf("Process %d has terminated.\n", current->data.pid);
                 removeProcess(pid_test);
                 break;
             } else {
@@ -265,8 +265,6 @@ int main(int argc, char *argv[]) {
             }
             continue;
         }
-
-        // Need to modify this to use linked list
 
         // List background processes. ie: print out bg_pid.
         if (strcmp(command[0], "bglist") == 0) {
