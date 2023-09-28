@@ -22,5 +22,6 @@ void addProcess(struct bgProcess data);
 int removeProcess(pid_t pid);
 void printList();
 void printProcess(struct bgProcess data);
+void cleanUp();
 
 #endif

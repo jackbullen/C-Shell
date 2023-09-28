@@ -1,6 +1,8 @@
 #include "bg_processes.h"
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
+#include <errno.h>
 
 struct Node *head = NULL;
 
@@ -43,4 +45,22 @@ int removeProcess(pid_t pid) {
         current = current->next;
     }
     return 0;
+}
+
+void cleanUp() {
+    struct Node *current = head, *next = NULL;
+    while (current != NULL) {
+        next = current->next;
+
+        if (kill(current->data.pid, SIGTERM) == -1){
+            if (errno == ESRCH) {
+                printf("Process %d not found\n", current->data.pid);
+            } else {
+                perror("Error killing process");
+            }
+        }
+        free(current->data.name);
+        free(current);
+        current = next;
+    }
 }

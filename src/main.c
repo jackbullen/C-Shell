@@ -128,7 +128,9 @@ void callCommand(char *command, char **commands, pid_t pid) {
 }
 
 void handle_signal(int signal) {
+    // Handle SIGINT and SIGTERM
     pthread_mutex_destroy(&lock);
+    cleanUp(); // clear links
     exit(0);
 }
 
@@ -215,6 +217,8 @@ int main(int argc, char *argv[]) {
 
         // Exit.
         if (strcmp(command[0], "exit") == 0) {
+            pthread_mutex_destroy(&lock);
+            cleanUp();
             exit(0);
         }
 
@@ -286,6 +290,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Kill a background process.
+        // Takes in the counter of the process to kill from bglist, not the pid
         if (strcmp(command[0], "bgkill") == 0) {
             if (command[1] == NULL) {
                 printf("\nError: Trying to kill an invalid process number.\nRun <bglist> to see active background processes.\n\n");
@@ -306,7 +311,7 @@ int main(int argc, char *argv[]) {
             }
             
             if (current == NULL) {
-                printf("\nError: Process number %d does not exist.\nRun <bglist> to see active background processes.\n\n", index);
+                printf("\nError: Process number %d does not exist.\nRun <bglist> to see active background processes. \nPass the process # to <bgkill>, not the process ID.\n\n", index);
                 continue;
             }
 
