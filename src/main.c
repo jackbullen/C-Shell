@@ -304,7 +304,7 @@ int main(int argc, char *argv[]) {
                 current = current->next;
                 currentIndex++;
             }
-
+            
             if (current == NULL) {
                 printf("\nError: Process number %d does not exist.\nRun <bglist> to see active background processes.\n\n", index);
                 continue;
@@ -336,7 +336,7 @@ int main(int argc, char *argv[]) {
 
             else {
                 // Parent process
-                usleep(2600);
+                // usleep(2600);
                 struct bgProcess newProcess;
                 newProcess.pid = cid;
                 newProcess.state = "R";

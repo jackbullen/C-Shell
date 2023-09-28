@@ -50,6 +50,9 @@ char** my_completion(const char* text, int start, int end) {
             // printf("adding slash, command=%s\n", command);
             rl_completion_append_character = '/';
         }
+        else {
+            rl_completion_append_character = ' ';
+        }
         
         free(command_str);
     }
