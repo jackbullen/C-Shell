@@ -319,6 +319,58 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if (strcmp(command[0], "bgstop") == 0) {
+            if (command[1] == NULL) {
+                continue;
+            }
+
+            int index = atoi(command[1]);
+            if (index <= 0) {
+                continue;
+            }
+
+            struct Node* current = getHead();
+            int currentIndex = 1;
+            while (current != NULL && currentIndex < index) {
+                current = current->next;
+                currentIndex++;
+            }
+
+            if (current == NULL) {
+                continue;
+            }
+
+            kill(current->data.pid, SIGSTOP);
+            current->data.state = "S";
+            continue;
+        }
+
+        if (strcmp(command[0], "bgstart") == 0) {
+            if (command[1] == NULL) {
+                continue;
+            }
+
+            int index = atoi(command[1]);
+            if (index <= 0) {
+                continue;
+            }
+
+            struct Node* current = getHead();
+            int currentIndex = 1;
+            while (current != NULL && currentIndex < index) {
+                current = current->next;
+                currentIndex++;
+            }
+
+            if (current == NULL) {
+                continue;
+            }
+
+            kill(current->data.pid, SIGCONT);
+            current->data.state = "R";
+            continue;
+        }
+
         // Execute background process.
         if (strcmp(command[0], "bg") == 0) {
             // If no cmd is passed to run in bg.
@@ -374,8 +426,6 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // cmd is from readline and command from mallod, which created memory
-        // Therefore we must free them.
         free(cmd);
         free(command);
 

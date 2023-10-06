@@ -25,6 +25,7 @@ void addProcess(struct bgProcess data) {
     struct Node *newNode = createNode(data);
     newNode->next = head;
     newNode->data.name = strdup(data.name);
+    newNode->data.state = strdup(data.state);
     head = newNode;
 }
 
@@ -60,6 +61,7 @@ void cleanUp() {
             }
         }
         free(current->data.name);
+        free(current->data.state);
         free(current);
         current = next;
     }
