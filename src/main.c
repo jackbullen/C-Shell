@@ -4,6 +4,7 @@
  * A simple shell.
  */
 #include <errno.h>
+#include <pthread.h>
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <signal.h>
@@ -12,8 +13,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <pthread.h>
-#include "completions.h"
+
 #include "bg_processes.h"
 
 #define CONFIG_FILE "/.myshellrc"
@@ -21,17 +21,17 @@
 
 pthread_mutex_t lock;
 
-void* monitor_bg_processes(void* arg) {
+void *monitor_bg_processes(void *arg) {
     int stat;
     while (1) {
         pthread_mutex_lock(&lock);
-        struct Node* current = getHead();
+        struct Node *current = getHead();
         while (current != NULL) {
             pid_t pid_test = waitpid(current->data.pid, &stat, WNOHANG);
             if (pid_test < 0) {
                 perror("PID_TESTING ERROR:");
             }
-            if (pid_test > 0){
+            if (pid_test > 0) {
                 printf("Process %d has terminated.\n", current->data.pid);
                 removeProcess(pid_test);
                 break;
@@ -106,7 +106,7 @@ void incrementColor(const char *color_code, char *incremented_color_code) {
     sprintf(incremented_color_code, "\033[0;%dm", color_value);
 }
 
-void changePrompt(char* cwd, const char* color_code, const char* uid, const char* wd) {
+void changePrompt(char *cwd, const char *color_code, const char *uid, const char *wd) {
     char incremented_color_code[16];
     incrementColor(color_code, incremented_color_code);
 
@@ -118,7 +118,6 @@ void changePrompt(char* cwd, const char* color_code, const char* uid, const char
     strcat(cwd, wd);
     strcat(cwd, "\033[0m");
     strcat(cwd, " % ");
-
 }
 
 void callCommand(char *command, char **commands, pid_t pid) {
@@ -130,16 +129,13 @@ void callCommand(char *command, char **commands, pid_t pid) {
 void handle_signal(int signal) {
     // Handle SIGINT and SIGTERM
     pthread_mutex_destroy(&lock);
-    cleanUp(); // clear links
+    cleanUp();  // clear links
     exit(0);
 }
 
 int main(int argc, char *argv[]) {
-
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
-
-    initialize_completions();
 
     // Initialize monitor thread mutex
     if (pthread_mutex_init(&lock, NULL) != 0) {
@@ -170,14 +166,6 @@ int main(int argc, char *argv[]) {
     if (lastSlash) {
         pwd = lastSlash + 1;
     }
-    // strcat(cwd, color_code);
-    // strcat(cwd, uid);
-    // strcat(cwd, "\033[0m");
-    // strcat(cwd, "@");
-    // strcat(cwd, incremented_color_code);
-    // strcat(cwd, pwd);
-    // strcat(cwd, "\033[0m");
-    // strcat(cwd, " % ");
 
     changePrompt(cwd, color_code, uid, pwd);
 
@@ -185,7 +173,6 @@ int main(int argc, char *argv[]) {
 
     // Infinite for loop that keeps our shell running.
     for (;;) {
-
         char *cmd = readline(cwd);
 
         if (strlen(cmd) == 0) {
@@ -272,7 +259,7 @@ int main(int argc, char *argv[]) {
 
         // List background processes. ie: print out bg_pid.
         if (strcmp(command[0], "bglist") == 0) {
-            struct Node* current = getHead();
+            struct Node *current = getHead();
             if (current == NULL) {
                 printf("\nCurrently no background processes.\n\n");
                 continue;
@@ -303,13 +290,13 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            struct Node* current = getHead();
+            struct Node *current = getHead();
             int currentIndex = 1;
             while (current != NULL && currentIndex < index) {
                 current = current->next;
                 currentIndex++;
             }
-            
+
             if (current == NULL) {
                 printf("\nError: Process number %d does not exist.\nRun <bglist> to see active background processes. \nPass the process # to <bgkill>, not the process ID.\n\n", index);
                 continue;
@@ -319,7 +306,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        if (strcmp(command[0], "bgstop") == 0) {
+        // Background Pause
+        if (strcmp(command[0], "bgpause") == 0) {
             if (command[1] == NULL) {
                 continue;
             }
@@ -329,7 +317,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            struct Node* current = getHead();
+            struct Node *current = getHead();
             int currentIndex = 1;
             while (current != NULL && currentIndex < index) {
                 current = current->next;
@@ -345,7 +333,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        if (strcmp(command[0], "bgstart") == 0) {
+        // Background Resume
+        if (strcmp(command[0], "bgr") == 0) {
             if (command[1] == NULL) {
                 continue;
             }
@@ -355,7 +344,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            struct Node* current = getHead();
+            struct Node *current = getHead();
             int currentIndex = 1;
             while (current != NULL && currentIndex < index) {
                 current = current->next;
@@ -393,7 +382,6 @@ int main(int argc, char *argv[]) {
 
             else {
                 // Parent process
-                // usleep(2600);
                 struct bgProcess newProcess;
                 newProcess.pid = cid;
                 newProcess.state = "R";
@@ -401,35 +389,26 @@ int main(int argc, char *argv[]) {
                 newProcess.name = command[1];
                 addProcess(newProcess);
             }
-        }
-
-        else {
+        } else {
             // Execute foreground process.
-
             cid = fork();
-
             if (cid < 0) {
                 perror("Fork failure.");
                 exit(1);
             }
-
             // For child process:
             if (cid == 0) {
                 callCommand(command[0], command, cid);
                 exit(0);
             }
-
             // For parent process:
             else {
                 int status;
                 waitpid(cid, &status, WUNTRACED);
             }
         }
-
         free(cmd);
         free(command);
-
-        
     }
     pthread_mutex_destroy(&lock);
     return 0;

@@ -50,17 +50,18 @@ Once the shell is running, interact with it by typing commands at the prompt.
 - `bg [cmd]`: Executes [cmd] as a background process.
 - `bglist`: Lists all background processes.
 - `bgkill [n]`: Kills the background process numbered [n] in the bglist.
-- `stop [n]`: Sends SIGSTOP to the background process numbered [n] in the bglist.
-- `start [n]`: Sends SIGCONT to the background process numbered [n] in the bglist.
+- `bgp [n]`: Sends SIGSTOP to the background process numbered [n] in the bglist.
+- `bgr [n]`: Sends SIGCONT to the background process numbered [n] in the bglist.
+
+## Additional Features
+
 - `pstat [n]`: Prints the status of the background process numbered [n] in the bglist.
 - `history [n]`: Prints the last [n] commands entered by the user.
 - `!n`: Executes the nth command in the history.
 
 ## Issues/Notes
 
-- The bg command does not perform error checking if a command is not passed to run in the background.
-
-- The program supports a maximum of 5 background processes simultaneously.
+- The program supports unlimited background processes.
 
 - The program reads configuration from a file named .myshellrc located in the working directory.
 
