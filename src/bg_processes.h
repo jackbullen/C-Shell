@@ -17,7 +17,7 @@ struct Node {
 };
 
 struct Node* getHead(void);
-struct Node *createNode(struct bgProcess data);
+struct Node* createNode(struct bgProcess data);
 void addProcess(struct bgProcess data);
 int removeProcess(pid_t pid);
 void printList();

@@ -243,14 +243,6 @@ int main(int argc, char *argv[]) {
                         lastSlash = newPrompt;
                     }
 
-                    // strcat(cwd, color_code);
-                    // strcat(cwd, uid);
-                    // strcat(cwd, "\033[0m");
-                    // strcat(cwd, "@");
-                    // strcat(cwd, incremented_color_code);
-                    // strcat(cwd, lastSlash);
-                    // strcat(cwd, "\033[0m");
-                    // strcat(cwd, " % ");
                     changePrompt(cwd, color_code, uid, lastSlash);
                 }
             }

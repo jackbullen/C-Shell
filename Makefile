@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -I./include -Wall
+CFLAGS = -Wall
 LDFLAGS = -lreadline -lpthread
 
 SRCS = ./src/main.c ./src/bg_processes.c
