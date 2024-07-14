@@ -122,7 +122,6 @@ void changePrompt(char *cwd, const char *color_code, const char *uid,
 }
 
 void callCommand(char *command, char **commands, pid_t pid) {
-  printf("%s : %s", command, *commands);
   execvp(command, commands);
   perror("Call command Error ");
 }
