@@ -3,15 +3,10 @@
  *
  * A simple shell.
  */
-#include <errno.h>
 #include <pthread.h>
 #include <readline/history.h>
-#include <readline/readline.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include "bg_processes.h"
