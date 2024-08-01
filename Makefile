@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall
 LDFLAGS = -lreadline -lpthread
 
-SRCS = ./src/main.c ./src/bg_processes.c
+SRCS = $(wildcard ./src/*.c)
 OBJS = $(patsubst ./src/%.c, ./obj/%.o, $(SRCS))
 
 TARGET = ./bin/myshell
