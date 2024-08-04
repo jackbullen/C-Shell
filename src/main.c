@@ -152,7 +152,4 @@ int main(int argc, char *argv[]) {
     free(cmd);
     free(command);
   } // shell loop
-
-  pthread_mutex_destroy(&lock);
-  return 0;
 }

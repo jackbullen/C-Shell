@@ -15,18 +15,20 @@ typedef struct bg_process {
   char *state;
 } bg_process;
 
-typedef struct node {
+typedef struct node_t {
   struct bg_process data;
-  struct node *next;
-} node;
+  struct node_t *next;
+} node_t;
 
-node *get_head(void);
-node *create_node(bg_process data);
+node_t *get_head(void);
+node_t *node_create(bg_process data);
+void node_clean(node_t *node);
+
 void bg_add(bg_process data);
-int bg_remove(pid_t pid);
 void bg_clean();
 void bg_print();
 void bg_kill(int index);
+node_t *bg_get(int index);
 void bg_pause(int index);
 void bg_resume(int index);
 void bg_execute(char **command);

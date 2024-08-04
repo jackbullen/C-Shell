@@ -1,11 +1,11 @@
 #include "bg_processes.h"
 
-node *head = NULL;
+node_t *head = NULL;
 
-node *get_head() { return head; }
+node_t *get_head() { return head; }
 
-node *create_node(bg_process data) {
-  node *new_node = (node *)malloc(sizeof(node));
+node_t *node_create(bg_process data) {
+  node_t *new_node = (node_t *)malloc(sizeof(node_t));
   if (!new_node) {
     perror("Unable to allocate memory for new node");
     exit(1);
@@ -15,55 +15,39 @@ node *create_node(bg_process data) {
   return new_node;
 }
 
+void node_clean(node_t *node) {
+  free(node->data.name);
+  free(node);
+}
+
 void bg_add(bg_process data) {
-  node *new_node = create_node(data);
+  node_t *new_node = node_create(data);
   new_node->next = head;
   new_node->data.name = strdup(data.name);
   new_node->data.state = strdup(data.state);
   head = new_node;
 }
 
-int bg_remove(pid_t pid) {
-  node *current = head, *prev = NULL;
-  while (current != NULL) {
-    if (current->data.pid == pid) {
-      if (prev == NULL) {
-        head = current->next;
-      } else {
-        prev->next = current->next;
-      }
-      free(current->data.name);
-      free(current);
-      return 1;
-    }
-    prev = current;
-    current = current->next;
-  }
-  return 0;
-}
-
 void bg_clean() {
-  node *current = head, *next = NULL;
-  while (current != NULL) {
-    next = current->next;
+  node_t *node = head, *next = NULL;
+  while (node != NULL) {
+    next = node->next;
 
-    if (kill(current->data.pid, SIGTERM) == -1) {
+    if (kill(node->data.pid, SIGTERM) == -1) {
       if (errno == ESRCH) {
-        printf("Process %d not found\n", current->data.pid);
+        printf("Process %d not found\n", node->data.pid);
       } else {
         perror("Error killing process");
       }
     }
-    free(current->data.name);
-    free(current->data.state);
-    free(current);
-    current = next;
+    node_clean(node);
+    node = next;
   }
 }
 
 void bg_print() {
-  node *current = get_head();
-  if (current == NULL) {
+  node_t *node = get_head();
+  if (node == NULL) {
     printf("\nCurrently no background processes.\n\n");
     return;
   }
@@ -72,86 +56,66 @@ void bg_print() {
   printf("\n");
   printf("%2s %6s   %10s    %4s\n", "#", "State", "Process ID", "Name");
   int index = 1;
-  while (current != NULL) {
-    printf("%2d   [%s]  %10d  %8s\n", index, current->data.state,
-           current->data.pid, current->data.name);
-    current = current->next;
+  while (node != NULL) {
+    printf("%2d   [%s]  %10d  %8s\n", index, node->data.state,
+           node->data.pid, node->data.name);
+    node = node->next;
     index++;
   }
   printf("\n");
 }
 
-void bg_kill(int index) {
+node_t *bg_get(int index) {
   if (index <= 0) {
-    printf("\nError: Trying to kill an invalid process number.\nRun "
-           "<bglist> to see active background processes.\n\n");
-    return;
+    printf("\nError: Invalid process index.\n\n");
+    return NULL;
   }
 
-  node *current = get_head();
+  node_t *node = get_head();
   int i = 1;
-  while (current != NULL && i < index) {
-    current = current->next;
+  while (node != NULL && i < index) {
+    node = node->next;
     i++;
   }
 
-  if (current == NULL) {
+  if (node == NULL) {
     printf("\nError: Process number %d does not exist.\nRun <bglist> to "
            "see active background processes. \nPass the process # to "
            "<bgkill>, not the process ID.\n\n",
            index);
-    return;
+    return NULL;
   }
 
-  kill(current->data.pid, SIGTERM);
+  return node;
+}
+
+void bg_kill(int index) {
+  node_t *node = bg_get(index);
+  if (!node)
+    return;
+
+  kill(node->data.pid, SIGTERM);
 }
 
 void bg_pause(int index) {
-  if (index <= 0) {
-    printf("\nError: Invalid process to pause.\n\n");
+  node_t *node = bg_get(index);
+  if (!node)
     return;
-  }
 
-  node *current = get_head();
-  int i = 1;
-  while (current != NULL && i < index) {
-    current = current->next;
-    i++;
-  }
-
-  if (current == NULL) {
-    printf("\nError: Less than %d active processes.\n\n", index);
-    return;
-  }
-
-  kill(current->data.pid, SIGSTOP);
-  current->data.state = "P";
+  kill(node->data.pid, SIGSTOP);
+  node->data.state = "P";
 }
 
 void bg_resume(int index) {
-  if (index <= 0) {
-    printf("\nError: Invalid process to pause.\n\n");
+  node_t *indexed_node = bg_get(index);
+  if (!indexed_node)
     return;
-  }
 
-  node *current = get_head();
-  int i = 1;
-  while (current != NULL && i < index) {
-    current = current->next;
-    i++;
-  }
-
-  if (current == NULL) {
-    printf("\nError: Less than %d active processes.\n\n", index);
-    return;
-  }
-
-  kill(current->data.pid, SIGCONT);
-  current->data.state = "R";
+  kill(indexed_node->data.pid, SIGCONT);
+  indexed_node->data.state = "R";
 }
 
 void bg_execute(char **command) {
-  // If no cmd is passed to run in bg.
   if (command[0] == NULL) {
     return;
   }
@@ -184,18 +148,18 @@ void *bg_monitor(void *arg) {
   int stat;
   while (1) {
     pthread_mutex_lock(&lock);
-    node *current = get_head();
-    while (current != NULL) {
-      pid_t pid_test = waitpid(current->data.pid, &stat, WNOHANG);
+    node_t *node = get_head();
+    while (node != NULL) {
+      pid_t pid_test = waitpid(node->data.pid, &stat, WNOHANG);
       if (pid_test < 0) {
         perror("PID_TESTING ERROR:");
       }
       if (pid_test > 0) {
-        printf("Process %d has terminated.\n", current->data.pid);
-        bg_remove(pid_test);
+        printf("Process %d has terminated.\n", node->data.pid);
+        node_clean(node);
         break;
       } else {
-        current = current->next;
+        node = node->next;
       }
     }
     pthread_mutex_unlock(&lock);
