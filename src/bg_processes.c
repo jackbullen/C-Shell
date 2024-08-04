@@ -1,11 +1,11 @@
 #include "bg_processes.h"
 
-struct node *head = NULL;
+node *head = NULL;
 
-struct node *get_head() { return head; }
+node *get_head() { return head; }
 
-struct node *create_node(struct bg_process data) {
-  struct node *new_node = (struct node *)malloc(sizeof(struct node));
+node *create_node(bg_process data) {
+  node *new_node = (node *)malloc(sizeof(node));
   if (!new_node) {
     perror("Unable to allocate memory for new node");
     exit(1);
@@ -15,8 +15,8 @@ struct node *create_node(struct bg_process data) {
   return new_node;
 }
 
-void bg_add(struct bg_process data) {
-  struct node *new_node = create_node(data);
+void bg_add(bg_process data) {
+  node *new_node = create_node(data);
   new_node->next = head;
   new_node->data.name = strdup(data.name);
   new_node->data.state = strdup(data.state);
@@ -24,7 +24,7 @@ void bg_add(struct bg_process data) {
 }
 
 int bg_remove(pid_t pid) {
-  struct node *current = head, *prev = NULL;
+  node *current = head, *prev = NULL;
   while (current != NULL) {
     if (current->data.pid == pid) {
       if (prev == NULL) {
@@ -43,7 +43,7 @@ int bg_remove(pid_t pid) {
 }
 
 void bg_clean() {
-  struct node *current = head, *next = NULL;
+  node *current = head, *next = NULL;
   while (current != NULL) {
     next = current->next;
 
@@ -62,7 +62,7 @@ void bg_clean() {
 }
 
 void bg_print() {
-  struct node *current = get_head();
+  node *current = get_head();
   if (current == NULL) {
     printf("\nCurrently no background processes.\n\n");
     return;
@@ -88,7 +88,7 @@ void bg_kill(int index) {
     return;
   }
 
-  struct node *current = get_head();
+  node *current = get_head();
   int i = 1;
   while (current != NULL && i < index) {
     current = current->next;
@@ -112,7 +112,7 @@ void bg_pause(int index) {
     return;
   }
 
-  struct node *current = get_head();
+  node *current = get_head();
   int i = 1;
   while (current != NULL && i < index) {
     current = current->next;
@@ -134,7 +134,7 @@ void bg_resume(int index) {
     return;
   }
 
-  struct node *current = get_head();
+  node *current = get_head();
   int i = 1;
   while (current != NULL && i < index) {
     current = current->next;
@@ -165,13 +165,13 @@ void bg_execute(char **command) {
 
   if (cid == 0) {
     // Child process
-    call_command(command[0], command, cid);
+    call_command(command[0], command);
     exit(0);
   }
 
   else {
     // Parent process
-    struct bg_process new_process;
+    bg_process new_process;
     new_process.pid = cid;
     new_process.state = "R";
     new_process.status = 0;
@@ -184,7 +184,7 @@ void *bg_monitor(void *arg) {
   int stat;
   while (1) {
     pthread_mutex_lock(&lock);
-    struct node *current = get_head();
+    node *current = get_head();
     while (current != NULL) {
       pid_t pid_test = waitpid(current->data.pid, &stat, WNOHANG);
       if (pid_test < 0) {

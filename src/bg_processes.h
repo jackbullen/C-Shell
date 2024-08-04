@@ -8,21 +8,21 @@
 
 extern pthread_mutex_t lock;
 
-struct bg_process {
+typedef struct bg_process {
   pid_t pid;
   char *name;
   int status;
   char *state;
-};
+} bg_process;
 
-struct node {
+typedef struct node {
   struct bg_process data;
   struct node *next;
-};
+} node;
 
-struct node *get_head(void);
-struct node *create_node(struct bg_process data);
-void bg_add(struct bg_process data);
+node *get_head(void);
+node *create_node(bg_process data);
+void bg_add(bg_process data);
 int bg_remove(pid_t pid);
 void bg_clean();
 void bg_print();

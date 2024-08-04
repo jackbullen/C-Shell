@@ -8,7 +8,7 @@ void execute_and_wait(char **command) {
   }
 
   if (cid == 0) { // child
-    call_command(command[0], command, cid);
+    call_command(command[0], command);
     exit(0);
   }
 
@@ -18,7 +18,7 @@ void execute_and_wait(char **command) {
   }
 }
 
-void call_command(char *command, char **commands, pid_t pid) {
+void call_command(char *command, char **commands) {
   execvp(command, commands);
   perror("Call command Error ");
 }
