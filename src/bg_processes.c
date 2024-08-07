@@ -28,6 +28,24 @@ void bg_add(bg_process data) {
   head = new_node;
 }
 
+void bg_remove(int index) {
+  if (index == 1) { // remove first
+    node_t *tmp = head;
+    head = head->next;
+    node_clean(tmp);
+    return;
+  }
+
+  node_t *node = bg_get(index - 1);
+
+  if (node == NULL) // node does not exist
+    return;
+
+  node_t *tmp = node->next;
+  node->next = tmp->next;
+  node_clean(tmp);
+}
+
 void bg_clean() {
   node_t *node = head, *next = NULL;
   while (node != NULL) {
@@ -57,8 +75,8 @@ void bg_print() {
   printf("%2s %6s   %10s    %4s\n", "#", "State", "Process ID", "Name");
   int index = 1;
   while (node != NULL) {
-    printf("%2d   [%s]  %10d  %8s\n", index, node->data.state,
-           node->data.pid, node->data.name);
+    printf("%2d   [%s]  %10d  %8s\n", index, node->data.state, 
+            node->data.pid, node->data.name);
     node = node->next;
     index++;
   }
@@ -94,7 +112,9 @@ void bg_kill(int index) {
   if (!node)
     return;
 
-  kill(node->data.pid, SIGTERM);
+  pid_t node_pid = node->data.pid;
+  bg_remove(index);
+  kill(node_pid, SIGTERM);
 }
 
 void bg_pause(int index) {
@@ -107,12 +127,12 @@ void bg_pause(int index) {
 }
 
 void bg_resume(int index) {
-  node_t *indexed_node = bg_get(index);
-  if (!indexed_node)
+  node_t *node = bg_get(index);
+  if (!node) 
     return;
 
-  kill(indexed_node->data.pid, SIGCONT);
-  indexed_node->data.state = "R";
+  kill(node->data.pid, SIGCONT);
+  node->data.state = "R";
 }
 
 void bg_execute(char **command) {
@@ -139,13 +159,14 @@ void bg_execute(char **command) {
     new_process.pid = cid;
     new_process.state = "R";
     new_process.status = 0;
-    new_process.name = command[1];
+    new_process.name = command[0];
     bg_add(new_process);
   }
 }
 
 void *bg_monitor(void *arg) {
   int stat;
+  int i = 0;
   while (1) {
     pthread_mutex_lock(&lock);
     node_t *node = get_head();
@@ -156,10 +177,11 @@ void *bg_monitor(void *arg) {
       }
       if (pid_test > 0) {
         printf("Process %d has terminated.\n", node->data.pid);
-        node_clean(node);
+        bg_remove(i);
         break;
       } else {
         node = node->next;
+        i++;
       }
     }
     pthread_mutex_unlock(&lock);

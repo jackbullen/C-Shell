@@ -18,8 +18,8 @@ void execute_and_wait(char **command) {
   }
 }
 
-void call_command(char *command, char **commands) {
-  execvp(command, commands);
+void call_command(char *file, char **commands) {
+  execvp(file, commands);
   perror("Call command Error ");
 }
 

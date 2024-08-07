@@ -5,8 +5,7 @@
  */
 
 // TODO:
-// 1. Address issue when exiting with or killing SIGSTOP process
-// 2. Rather than having command functions return void, have them return status.
+// 1. Rather than having command functions return void, have them return status.
 
 #include "bg_processes.h"
 #include "commands.h"
@@ -137,7 +136,7 @@ int main(int argc, char *argv[]) {
       }
 
       int index = atoi(command[1]);
-      bg_pause(index);
+      bg_resume(index);
     }
 
     // Execute background process
